@@ -1,0 +1,146 @@
+# Deploy — from main ONLY, via CI ONLY (never by hand; agents never build/push
+# images locally — CI does). On every push to main, after the test-gate:
+#   1. build + push the Go API image to Artifact Registry
+#   2. terraform apply (infra, namespaced by slug; passes the fresh image) — never leave drift
+#   3. deploy the Next.js web to Vercel
+#   4. post-deploy LIVE smoke check (hit the API /healthz and the landing page)
+#      so a stale/failed deploy is caught here, not by a user.
+#
+# All real values come from repo/Org secrets — nothing is committed. Set:
+#   GCP_SA_KEY, GCP_PROJECT, TF_STATE_BUCKET, NEON_API_KEY, LLM_API_KEY,
+#   VERCEL_API_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+# and the repo variables: SLUG, REGION.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+# Never let two main deploys race each other into terraform apply.
+concurrency:
+  group: deploy-${{ vars.SLUG }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  SLUG: ${{ vars.SLUG }}
+  REGION: ${{ vars.REGION }}
+  GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
+
+jobs:
+  # ---- Test-gate also runs on main: never deploy an untested commit. --------
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  build-push:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Compute image ref
+        id: image
+        run: echo "image=${REGION}-docker.pkg.dev/${GCP_PROJECT}/poc/${SLUG}-api:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
+
+      - name: Build API image
+        run: docker build -t "${{ steps.image.outputs.image }}" api/
+
+      - name: Push API image
+        run: docker push "${{ steps.image.outputs.image }}"
+
+  # ---- Apply infra (Terraform) with the freshly pushed image. ---------------
+  terraform:
+    needs: build-push
+    runs-on: ubuntu-latest
+    outputs:
+      api_url: ${{ steps.out.outputs.api_url }}
+    defaults:
+      run:
+        working-directory: infra/
+    env:
+      TF_VAR_llm_api_key: ${{ secrets.LLM_API_KEY }}
+      TF_VAR_neon_api_key: ${{ secrets.NEON_API_KEY }}
+      TF_VAR_vercel_api_token: ${{ secrets.VERCEL_API_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform init (GCS remote state)
+        run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" -backend-config="prefix=poc/${SLUG}"
+
+      - name: Terraform apply
+        run: terraform apply -auto-approve -var "api_image=${{ needs.build-push.outputs.image }}"
+
+      - name: Export outputs
+        id: out
+        run: echo "api_url=$(terraform output -raw api_url)" >> "$GITHUB_OUTPUT"
+
+  # ---- Deploy the web to Vercel. --------------------------------------------
+  deploy-web:
+    needs: terraform
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel env
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_API_TOKEN }}
+
+      - name: Build web
+        run: vercel build --prod --token=${{ secrets.VERCEL_API_TOKEN }}
+
+      - name: Deploy web (production)
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_API_TOKEN }}
+
+  # ---- Post-deploy LIVE smoke check: fail loud on a stale/broken deploy. -----
+  smoke:
+    needs: [terraform, deploy-web]
+    runs-on: ubuntu-latest
+    env:
+      API_URL: ${{ needs.terraform.outputs.api_url }}
+    steps:
+      - name: API health check
+        run: |
+          echo "Checking ${API_URL}/healthz"
+          code=$(curl -fsS -o /dev/null -w "%{http_code}" --retry 5 --retry-delay 6 --retry-all-errors "${API_URL}/healthz")
+          test "$code" = "200" || { echo "API health check failed (HTTP $code)"; exit 1; }
+
+      - name: Landing page check
+        run: |
+          url="https://${SLUG}.vercel.app/"
+          echo "Checking ${url}"
+          code=$(curl -fsS -o /dev/null -w "%{http_code}" --retry 5 --retry-delay 6 --retry-all-errors "${url}")
+          test "$code" = "200" || { echo "Landing page check failed (HTTP $code)"; exit 1; }

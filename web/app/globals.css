@@ -1,0 +1,271 @@
+/* Constrained palette: ink, paper, one accent, one danger, grays.
+   Mobile-first. All interactive controls >= 44px tap target. */
+:root {
+  --paper: #ffffff;
+  --paper-2: #f6f7f9;
+  --ink: #14181f;
+  --ink-2: #4a5260;
+  --line: #e2e6ec;
+  --accent: #2f5bea;
+  --accent-ink: #ffffff;
+  --danger: #c0392b;
+  --radius: 10px;
+  --maxw: 760px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+main {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+a {
+  color: var(--accent);
+}
+
+/* ---- Buttons: minimum 44px tap target ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 18px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #2447c2;
+}
+.btn-secondary {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--paper-2);
+}
+
+/* ---- Landing ---- */
+.hero {
+  padding: 48px 0 8px;
+}
+.tagline {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.hero h1 {
+  font-size: clamp(28px, 6vw, 44px);
+  line-height: 1.12;
+  margin: 0 0 16px;
+  letter-spacing: -0.01em;
+}
+.hero p {
+  font-size: 18px;
+  color: var(--ink-2);
+  margin: 0 0 28px;
+  max-width: 60ch;
+}
+.hero-cta {
+  display: inline-flex;
+}
+.hero-note {
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+/* ---- Generate page ---- */
+.gen-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: 15px;
+}
+.gen-title {
+  font-size: 22px;
+  margin: 8px 0 20px;
+}
+.field-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.input {
+  width: 100%;
+  min-height: 160px;
+  padding: 14px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  resize: vertical;
+}
+.input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.input-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-top: 6px;
+}
+.input-meta.over {
+  color: var(--danger);
+}
+.gen-submit {
+  margin-top: 16px;
+}
+.error-banner {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  color: var(--danger);
+  font-size: 15px;
+}
+
+/* ---- Output ---- */
+.output {
+  margin-top: 28px;
+}
+.output-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.output-body {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  background: var(--paper-2);
+  overflow-wrap: anywhere;
+}
+.output-body h1,
+.output-body h2,
+.output-body h3 {
+  line-height: 1.2;
+}
+.output-body pre,
+.ov-plain {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  margin: 0;
+}
+.output-body :where(table) {
+  border-collapse: collapse;
+  width: 100%;
+}
+.output-body :where(th, td) {
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+/* ---- Signal ---- */
+.signal {
+  margin-top: 32px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+.signal-question {
+  font-weight: 600;
+  font-size: 17px;
+  margin: 0 0 14px;
+}
+.signal-consent {
+  display: block;
+  font-size: 14px;
+  color: var(--ink-2);
+  margin-bottom: 10px;
+}
+.signal-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.signal-input {
+  flex: 1 1 220px;
+  min-height: 44px;
+  padding: 0 14px;
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.signal-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.signal-thumbs {
+  display: flex;
+  gap: 12px;
+}
+.signal-done {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+}
+.signal-error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 14px;
+}

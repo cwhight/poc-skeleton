@@ -1,0 +1,36 @@
+# Copy to terraform.tfvars per POC. The variables that define the deploy.
+# SECRETS DO NOT GO HERE — they are passed as TF_VAR_* env vars (CI secrets) and
+# stored in Secret Manager. Never commit terraform.tfvars with real values.
+
+# THE parameter — namespaces every resource. Matches idea.config.slug.
+slug = "scopelock"
+
+# --- GCP (Cloud Run + Secret Manager) ---
+gcp_project_id = "your-gcp-project-id" # PLACEHOLDER — set per POC (designated account).
+region         = "europe-west1"
+# api_image is passed by CI at apply time (the freshly built+pushed image):
+#   terraform apply -var "api_image=europe-west1-docker.pkg.dev/PROJECT/poc/scopelock-api:GITSHA"
+
+# --- LLM provider (vendor-neutral; only this provider is billed) ---
+llm_provider = "gemini"
+llm_model    = "gemini-2.0-flash" # PLACEHOLDER — set the model id for your provider.
+
+# --- Tunables (cost / abuse caps) ---
+max_input_bytes   = 12000
+rate_limit_per_ip = 20
+rate_limit_window = "1h"
+
+# --- Neon / Vercel non-secret ids (PLACEHOLDERS — set per POC) ---
+neon_org_id    = "org-xxxxxxxx"
+vercel_team_id = null              # null = personal scope; or "team_xxxx"
+web_git_repo   = "your-org/your-poc-repo"
+
+# --- SECRETS — set as env vars, NOT here ---
+#   export TF_VAR_llm_api_key=...        # billed LLM provider key
+#   export TF_VAR_neon_api_key=...       # Neon API key (manages the project)
+#   export TF_VAR_vercel_api_token=...   # Vercel API token
+#
+# Remote state bucket/prefix are passed at init, not here:
+#   terraform init \
+#     -backend-config="bucket=YOUR_TF_STATE_BUCKET" \
+#     -backend-config="prefix=poc/scopelock"
